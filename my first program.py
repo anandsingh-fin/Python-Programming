@@ -1,0 +1,12 @@
+first = int(input("enter the first number "))
+second = int(input("enter the second number "))
+print("sum",first+second)
+side = float(input("side of square"))
+print("area", side*side)
+first = float(input("enter the num"))
+base = float(input("enter the total value"))
+print((first+base)/2)
+a = int(input("first number"))
+b = int(input("second number"))
+
+print(a>b)
