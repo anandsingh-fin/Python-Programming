@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Swiggy Data Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom scrollbar for better aesthetics */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        .chart-container {
+            position: relative;
+            height: 400px;
+            width: 100%;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <!-- Header -->
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-900">Swiggy Restaurant Analysis</h1>
+            <p class="text-lg text-gray-600 mt-2">An interactive dashboard to explore restaurant data across India.</p>
+        </header>
+
+        <!-- Filters Section -->
+        <div class="bg-white p-6 rounded-2xl shadow-lg mb-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 items-center">
+            <div>
+                <label for="cityFilter" class="block text-sm font-medium text-gray-700">City</label>
+                <select id="cityFilter" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    <option value="all">All Cities</option>
+                </select>
+            </div>
+            <div>
+                <label for="stateFilter" class="block text-sm font-medium text-gray-700">State</label>
+                <select id="stateFilter" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    <option value="all">All States</option>
+                </select>
+            </div>
+            <div>
+                <label for="cuisineFilter" class="block text-sm font-medium text-gray-700">Cuisine</label>
+                <select id="cuisineFilter" class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                    <option value="all">All Cuisines</option>
+                </select>
+            </div>
+            <div>
+                <label for="priceFilter" class="block text-sm font-medium text-gray-700">Max Price: <span id="priceValue" class="font-bold"></span></label>
+                <input type="range" id="priceFilter" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+            </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <div class="bg-white p-6 rounded-2xl shadow-lg">
+                <h2 class="text-xl font-semibold mb-4 text-center">Restaurants per City</h2>
+                <div class="chart-container">
+                    <canvas id="cityChart"></canvas>
+                </div>
+            </div>
+            <div class="bg-white p-6 rounded-2xl shadow-lg">
+                <h2 class="text-xl font-semibold mb-4 text-center">Top Cuisines</h2>
+                <div class="chart-container">
+                    <canvas id="cuisineChart"></canvas>
+                </div>
+            </div>
+            <div class="bg-white p-6 rounded-2xl shadow-lg">
+                <h2 class="text-xl font-semibold mb-4 text-center">Price vs. Average Rating</h2>
+                <div class="chart-container">
+                    <canvas id="ratingChart"></canvas>
+                </div>
+            </div>
+            <div class="bg-white p-6 rounded-2xl shadow-lg">
+                <h2 class="text-xl font-semibold mb-4 text-center">Delivery Time Distribution</h2>
+                <div class="chart-container">
+                    <canvas id="deliveryChart"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Data Table Section -->
+        <div class="bg-white p-6 rounded-2xl shadow-lg">
+            <div class="flex flex-col md:flex-row justify-between items-center mb-4">
+                 <h2 class="text-xl font-semibold">Restaurant Listings</h2>
+                 <input type="text" id="searchInput" class="mt-4 md:mt-0 p-2 border border-gray-300 rounded-md w-full md:w-1/3" placeholder="Search restaurants...">
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Restaurant</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">City</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price (₹)</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg Rating</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cuisines</th>
+                        </tr>
+                    </thead>
+                    <tbody id="restaurantTable" class="bg-white divide-y divide-gray-200">
+                        <!-- Rows will be inserted here by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+             <div class="mt-4 flex justify-between items-center" id="paginationControls">
+                <!-- Pagination will be inserted here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let restaurantData = [];
+        let cityChart, cuisineChart, ratingChart, deliveryChart;
+        let currentPage = 1;
+        const rowsPerPage = 10;
+
+        // Fetch and parse the CSV data
+        async function loadData() {
+            // In a real web server, you'd fetch this. For a local file, we embed it.
+            // Using a small sample of your data for demonstration
+            const csvData = `ID,Area,City,Restaurant,Price,Avg ratings,Total ratings,Food type,Address,Delivery time,State
+211,Koramangala,Bangalore,Tandoor Hut,300,4.4,100,"Biryani,Chinese,North Indian,South Indian",5Th Block,59,Karnataka
+221,Koramangala,Bangalore,Tunday Kababi,300,4.1,100,"Mughlai,Lucknowi",5Th Block,56,Karnataka
+246,Jogupalya,Bangalore,Kim Lee,650,4.4,100,Chinese,Double Road,50,Karnataka
+248,Indiranagar,Bangalore,New Punjabi Hotel,250,3.9,500,"North Indian,Punjabi,Tandoor,Chinese",80 Feet Road,57,Karnataka
+249,Indiranagar,Bangalore,Nh8,350,4.0,50,"Rajasthani,Gujarati,North Indian,Snacks,Desserts,Beverages,Thalis,Chaat",80 Feet Road,63,Karnataka
+254,Indiranagar,Bangalore,Treat,800,4.5,100,"Mughlai,North Indian",100 Feet Road,56,Karnataka
+258,Indiranagar,Bangalore,Chinita Real Mexican Food,1000,4.5,500,"Mexican,Beverages,Salads",Double Road,53,Karnataka
+263,Koramangala,Bangalore,Cupcake Noggins - Cakespastries And Desserts,150,4.3,100,"Desserts,Bakery",6th Block,59,Karnataka
+271,Koramangala,Bangalore,Savoury Restaurant,600,4.1,5000,"Arabian,Chinese,North Indian,Tandoor,Biryani,Seafood",Madiwala,57,Karnataka
+272,Jayanagar,Bangalore,Hotel Manu,450,4.2,1000,"North Indian,South Indian,Chinese",4th Block,60,Karnataka
+308,Koramangala,Bangalore,Hotel Empire,750,4.2,10000,"North Indian,Biryani,Kebab,Chinese,Seafood,South Indian",5th Block,56,Karnataka
+310,Btm,Bangalore,Beijing Bites,700,4.2,5000,"Chinese,Thai,Momos",2nd Stage,56,Karnataka
+1541,Sion,Mumbai,Guru Kripa,300,4.4,1000,"North Indian,Snacks,Street Food,South Indian",Sion,57,Maharashtra
+1542,Sion,Mumbai,Modern Lunch Home,350,4.2,100,"South Indian,Chinese,North Indian",Sion,54,Maharashtra
+1543,Sion,Mumbai,Shree Datta Boarding,150,4.1,1000,Maharashtrian,Sion,51,Maharashtra
+1551,Ghatkopar Vikhroli,Mumbai,Mithila,300,4.2,100,North Indian,Ghatkopar,50,Maharashtra
+1552,Ghatkopar Vikhroli,Mumbai,Gurudev Punjabee,250,3.9,100,"North Indian,Chinese",Ghatkopar,54,Maharashtra
+4172,Adyar,Chennai,Sangeetha Veg Restaurant,300,4.4,5000,"South Indian,North Indian,Chinese,Beverages,Juices,Desserts",Gandhi Nagar,40,Tamil Nadu
+4173,Adyar,Chennai,Zaitoon,650,4.3,5000,"Arabian,North Indian,Chinese,Juices,Lebanese,Biryani,Mughlai",Adyar,47,Tamil Nadu
+4174,Adyar,Chennai,Dindigul Thalappakatti,650,4.1,5000,"Biryani,South Indian,Chinese,North Indian",Adyar,40,Tamil Nadu
+5011,Rohini,Delhi,Wah Bhai Wah,200,3.9,1000,"North Indian,Tandoor",Sector 3,41,Delhi
+5012,Rohini,Delhi,Aggarwal Sweets India,200,4.1,100,Sweets,Sector 8,36,Delhi
+5013,Rohini,Delhi,Giri Momos Centre,200,4.1,1000,"Chinese,Momos",Sector 1,40,Delhi
+6301,Park Street Area,Kolkata,Kusum Rolls,150,4.4,1000,"Rolls,Fast Food,North Indian,Street Food",Park Street,47,West Bengal
+6302,Park Street Area,Kolkata,Arsalan,700,4.2,5000,"Biryani,Mughlai,North Indian,Rolls,Kebab",Park Street Area,49,West Bengal
+8101,Banjara Hills,Hyderabad,Shah Ghouse Hotel & Restaurant,800,4.2,10000,"Biryani,North Indian,Chinese,Mughlai,Tandoor",Tolichowki,42,Telangana
+8102,Banjara Hills,Hyderabad,Hotel Shadab,850,4.3,10000,"Biryani,North Indian,Chinese,Mughlai",Ghasimiyabazar,47,Telangana
+9401,Ellis Bridge,Ahmedabad,Shakti - The Sandwich Shop,300,4.4,500,Sandwich,Ellis Bridge,40,Gujarat
+9402,Ellis Bridge,Ahmedabad,Honest,550,4.2,1000,"North Indian,Chinese,South Indian,Fast Food,Street Food",Ellis Bridge,39,Gujarat
+10101,Hadapsar,Pune,Rolls Mania,400,4.3,1000,Rolls,Amanora Mall,55,Maharashtra
+10102,Hadapsar,Pune,George Restaurant,600,4.3,1000,"North Indian,Mughlai,Biryani",Camp,59,Maharashtra`;
+
+            const rows = csvData.trim().split('\n').slice(1);
+            restaurantData = rows.map(row => {
+                const values = row.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/); // Regex to handle commas inside quotes
+                return {
+                    id: values[0],
+                    area: values[1],
+                    city: values[2],
+                    restaurant: values[3],
+                    price: parseInt(values[4]) || 0,
+                    avgRating: parseFloat(values[5]) || 0,
+                    totalRatings: parseInt(values[6]) || 0,
+                    foodType: values[7].replace(/"/g, ''),
+                    address: values[8],
+                    deliveryTime: parseInt(values[9]) || 0,
+                    state: values[10]
+                };
+            });
+            
+            // Clean up and populate filters
+            populateFilters();
+            // Initial render
+            updateDashboard();
+        }
+
+        function populateFilters() {
+            const cities = [...new Set(restaurantData.map(r => r.city))].sort();
+            const states = [...new Set(restaurantData.map(r => r.state).filter(s => s))].sort();
+            const allCuisines = new Set();
+            restaurantData.forEach(r => {
+                r.foodType.split(',').forEach(c => allCuisines.add(c.trim()));
+            });
+            const sortedCuisines = [...allCuisines].sort();
+
+            const cityFilter = document.getElementById('cityFilter');
+            const stateFilter = document.getElementById('stateFilter');
+            const cuisineFilter = document.getElementById('cuisineFilter');
+            const priceFilter = document.getElementById('priceFilter');
+            const priceValue = document.getElementById('priceValue');
+
+            cities.forEach(c => cityFilter.innerHTML += `<option value="${c}">${c}</option>`);
+            states.forEach(s => stateFilter.innerHTML += `<option value="${s}">${s}</option>`);
+            sortedCuisines.forEach(c => cuisineFilter.innerHTML += `<option value="${c}">${c}</option>`);
+
+            const maxPrice = Math.max(...restaurantData.map(r => r.price));
+            priceFilter.max = maxPrice;
+            priceFilter.value = maxPrice;
+            priceValue.textContent = `₹${maxPrice}`;
+
+            // Add event listeners
+            cityFilter.addEventListener('change', updateDashboard);
+            stateFilter.addEventListener('change', updateDashboard);
+            cuisineFilter.addEventListener('change', updateDashboard);
+            priceFilter.addEventListener('input', () => {
+                priceValue.textContent = `₹${priceFilter.value}`;
+            });
+            priceFilter.addEventListener('change', updateDashboard);
+            document.getElementById('searchInput').addEventListener('input', () => {
+                currentPage = 1;
+                updateDashboard();
+            });
+        }
+        
+        function getFilteredData() {
+            const selectedCity = document.getElementById('cityFilter').value;
+            const selectedState = document.getElementById('stateFilter').value;
+            const selectedCuisine = document.getElementById('cuisineFilter').value;
+            const maxPrice = document.getElementById('priceFilter').value;
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            
+            return restaurantData.filter(r => {
+                const cityMatch = selectedCity === 'all' || r.city === selectedCity;
+                const stateMatch = selectedState === 'all' || r.state === selectedState;
+                const cuisineMatch = selectedCuisine === 'all' || r.foodType.toLowerCase().includes(selectedCuisine.toLowerCase());
+                const priceMatch = r.price <= maxPrice;
+                const searchMatch = r.restaurant.toLowerCase().includes(searchTerm) || r.foodType.toLowerCase().includes(searchTerm);
+                return cityMatch && stateMatch && cuisineMatch && priceMatch && searchMatch;
+            });
+        }
+
+        function updateDashboard() {
+            const filteredData = getFilteredData();
+            updateCharts(filteredData);
+            updateTable(filteredData);
+        }
+
+        function updateCharts(data) {
+            updateCityChart(data);
+            updateCuisineChart(data);
+            updateRatingChart(data);
+            updateDeliveryChart(data);
+        }
+
+        function updateCityChart(data) {
+            const cityCounts = data.reduce((acc, r) => {
+                acc[r.city] = (acc[r.city] || 0) + 1;
+                return acc;
+            }, {});
+            const sortedCities = Object.entries(cityCounts).sort((a,b) => b[1] - a[1]).slice(0, 10);
+            
+            const labels = sortedCities.map(c => c[0]);
+            const values = sortedCities.map(c => c[1]);
+            
+            if (cityChart) cityChart.destroy();
+            cityChart = new Chart(document.getElementById('cityChart').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [{
+                        label: '# of Restaurants',
+                        data: values,
+                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: { maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+            });
+        }
+
+        function updateCuisineChart(data) {
+            const cuisineCounts = data.flatMap(r => r.foodType.split(','))
+                .map(c => c.trim())
+                .reduce((acc, c) => {
+                    acc[c] = (acc[c] || 0) + 1;
+                    return acc;
+                }, {});
+            const sortedCuisines = Object.entries(cuisineCounts).sort((a,b) => b[1] - a[1]).slice(0, 10);
+            
+            if (cuisineChart) cuisineChart.destroy();
+            cuisineChart = new Chart(document.getElementById('cuisineChart').getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: sortedCuisines.map(c => c[0]),
+                    datasets: [{
+                        label: 'Top Cuisines',
+                        data: sortedCuisines.map(c => c[1]),
+                        backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', '#C9CBCF', '#E7E9ED', '#8DDF3C', '#F17171'],
+                    }]
+                },
+                options: { maintainAspectRatio: false }
+            });
+        }
+
+        function updateRatingChart(data) {
+            const scatterData = data.map(r => ({x: r.price, y: r.avgRating}));
+            if (ratingChart) ratingChart.destroy();
+            ratingChart = new Chart(document.getElementById('ratingChart').getContext('2d'), {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'Price vs Rating',
+                        data: scatterData,
+                        backgroundColor: 'rgba(255, 99, 132, 0.6)'
+                    }]
+                },
+                options: { maintainAspectRatio: false, scales: { x: { title: { display: true, text: 'Price (₹)' } }, y: { title: { display: true, text: 'Average Rating' } } } }
+            });
+        }
+        
+        function updateDeliveryChart(data) {
+            const deliveryTimes = data.map(r => r.deliveryTime);
+            if (deliveryChart) deliveryChart.destroy();
+            deliveryChart = new Chart(document.getElementById('deliveryChart').getContext('2d'), {
+                type: 'bar',
+                 data: {
+                    labels: ['20-30', '30-40', '40-50', '50-60', '60-70', '70+'],
+                    datasets: [{
+                        label: 'Delivery Time (mins)',
+                        data: [
+                            deliveryTimes.filter(t => t > 20 && t <= 30).length,
+                            deliveryTimes.filter(t => t > 30 && t <= 40).length,
+                            deliveryTimes.filter(t => t > 40 && t <= 50).length,
+                            deliveryTimes.filter(t => t > 50 && t <= 60).length,
+                            deliveryTimes.filter(t => t > 60 && t <= 70).length,
+                            deliveryTimes.filter(t => t > 70).length,
+                        ],
+                        backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                    }]
+                },
+                options: { maintainAspectRatio: false, scales: { y: { beginAtZero: true, title: { display: true, text: '# of Restaurants' } } } }
+            });
+        }
+
+        function updateTable(data) {
+            const tableBody = document.getElementById('restaurantTable');
+            tableBody.innerHTML = '';
+            
+            const paginatedData = data.slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage);
+
+            paginatedData.forEach(r => {
+                const row = `<tr>
+                    <td class="px-6 py-4 whitespace-nowrap"><div class="text-sm font-medium text-gray-900">${r.restaurant}</div><div class="text-sm text-gray-500">${r.area}</div></td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${r.city}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${r.price}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm ${r.avgRating >= 4 ? 'text-green-600' : 'text-yellow-600'} font-semibold">${r.avgRating}</td>
+                    <td class="px-6 py-4 whitespace-normal text-sm text-gray-500" style="min-width: 200px;">${r.foodType}</td>
+                </tr>`;
+                tableBody.innerHTML += row;
+            });
+            
+            updatePaginationControls(data.length);
+        }
+
+        function updatePaginationControls(totalRows) {
+            const pageCount = Math.ceil(totalRows / rowsPerPage);
+            const controls = document.getElementById('paginationControls');
+            controls.innerHTML = '';
+
+            if (pageCount <= 1) return;
+
+            let buttons = `<span class="text-sm text-gray-700">Page ${currentPage} of ${pageCount}</span><div>`;
+
+            buttons += `<button class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 ${currentPage === 1 ? 'cursor-not-allowed' : ''}" onclick="changePage(currentPage - 1)" ${currentPage === 1 ? 'disabled' : ''}>Prev</button>`;
+            buttons += `<button class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 ${currentPage === pageCount ? 'cursor-not-allowed' : ''}" onclick="changePage(currentPage + 1)" ${currentPage === pageCount ? 'disabled' : ''}>Next</button>`;
+            
+            controls.innerHTML = buttons + `</div>`;
+        }
+
+        function changePage(newPage) {
+            const filteredData = getFilteredData();
+            const pageCount = Math.ceil(filteredData.length / rowsPerPage);
+            if (newPage > 0 && newPage <= pageCount) {
+                currentPage = newPage;
+                updateTable(filteredData);
+            }
+        }
+
+        // Initial load
+        document.addEventListener('DOMContentLoaded', loadData);
+    </script>
+</body>
+</html>
